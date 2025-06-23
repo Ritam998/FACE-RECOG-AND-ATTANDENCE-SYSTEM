@@ -1,0 +1,105 @@
+## HTML INTERFACE
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Face Recognition Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col items-center justify-center">
+
+  <header class="w-full bg-blue-700 text-white p-4 shadow-md">
+    <h1 class="text-2xl text-center font-bold">Face Recognition Attendance System</h1>
+  </header>
+
+  <main class="w-full max-w-xl mt-8 bg-white p-6 rounded-lg shadow-md">
+    <div class="flex flex-col items-center">
+      <video id="video" autoplay class="w-full rounded-md border border-blue-400"></video>
+
+      <canvas id="canvas" class="hidden"></canvas>
+
+      <div class="mt-4 space-x-3">
+        <button onclick="startCamera()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Start Camera</button>
+        <button onclick="captureFace()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">Capture</button>
+        <button onclick="markAttendance()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Mark Attendance</button>
+      </div>
+
+      <div id="status" class="mt-4 text-sm font-medium text-gray-700">
+        Status: Waiting for action...
+      </div>
+    </div>
+  </main>
+
+  <footer class="mt-auto p-4 text-sm text-gray-500">
+    &copy; 2025 Smart Attendance System Inc.
+  </footer>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const statusDiv = document.getElementById('status');
+
+    let streamStarted = false;
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        streamStarted = true;
+        statusDiv.textContent = "Camera started successfully.";
+      } catch (err) {
+        console.error("Camera error:", err);
+        statusDiv.textContent = "Error accessing camera.";
+      }
+    }
+
+    function captureFace() {
+      if (!streamStarted) {
+        statusDiv.textContent = "Start camera first.";
+        return;
+      }
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      statusDiv.textContent = "Face captured.";
+    }
+
+    async function markAttendance() {
+      if (!canvas.width) {
+        statusDiv.textContent = "Please capture the face first.";
+        return;
+      }
+
+      const imageData = canvas.toDataURL("image/png");
+
+      try {
+        const res = await fetch('/api/mark_attendance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ image: imageData })
+        });
+
+        const result = await res.json();
+
+        if (res.ok) {
+          statusDiv.textContent = "Attendance marked: " + result.message;
+        } else {
+          statusDiv.textContent = "Error: " + result.message;
+        }
+
+      } catch (err) {
+        console.error("API Error:", err);
+        statusDiv.textContent = "Network or server error.";
+      }
+    }
+  </script>
+</body>
+</html>
