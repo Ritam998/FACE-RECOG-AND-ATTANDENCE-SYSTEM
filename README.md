@@ -7,7 +7,8 @@ from sklearn.neighbors import KNeighborsClassifier
 import pandas as pd
 import joblib
 
-app = Flask(__name__)
+app = Flask(__name__,template_folder='templates')
+
 
 nimgs = 10
 
