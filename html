@@ -5,101 +5,134 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Recognition Attendance</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <title>Smart Face Attendance System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f0f2f5;
+    }
+    #video, #snapshot {
+      width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    .log-box {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
 </head>
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen flex flex-col items-center justify-center">
-
-  <header class="w-full bg-blue-700 text-white p-4 shadow-md">
-    <h1 class="text-2xl text-center font-bold">Face Recognition Attendance System</h1>
-  </header>
-
-  <main class="w-full max-w-xl mt-8 bg-white p-6 rounded-lg shadow-md">
-    <div class="flex flex-col items-center">
-      <video id="video" autoplay class="w-full rounded-md border border-blue-400"></video>
-
-      <canvas id="canvas" class="hidden"></canvas>
-
-      <div class="mt-4 space-x-3">
-        <button onclick="startCamera()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">Start Camera</button>
-        <button onclick="captureFace()" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition">Capture</button>
-        <button onclick="markAttendance()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">Mark Attendance</button>
-      </div>
-
-      <div id="status" class="mt-4 text-sm font-medium text-gray-700">
-        Status: Waiting for action...
+<body>
+<div class="container py-5">
+  <h2 class="text-center mb-4 text-primary">AI Face Recognition Attendance System</h2>
+  
+  <div class="row g-4">
+    <!-- Live Camera -->
+    <div class="col-md-8">
+      <div class="card p-3">
+        <h5 class="mb-3">Live Webcam</h5>
+        <video id="video" autoplay></video>
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
+          <button class="btn btn-success" onclick="takeSnapshot()">Capture & Mark Attendance</button>
+        </div>
       </div>
     </div>
-  </main>
 
-  <footer class="mt-auto p-4 text-sm text-gray-500">
-    &copy; 2025 Smart Attendance System Inc.
-  </footer>
+    <!-- Logs and Preview -->
+    <div class="col-md-4">
+      <div class="card p-3 mb-3">
+        <h5>Captured Snapshot</h5>
+        <canvas id="snapshot" style="display: none;"></canvas>
+        <img id="snapshotImg" class="img-fluid rounded" alt="Snapshot Preview" />
+      </div>
 
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const statusDiv = document.getElementById('status');
+      <div class="card p-3">
+        <h5 class="mb-2">Attendance Log</h5>
+        <div class="log-box">
+          <ul class="list-group" id="logList">
+            <!-- Entries will appear here -->
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    let streamStarted = false;
+  <div class="text-center mt-4">
+    <div id="status" class="alert d-none"></div>
+  </div>
+</div>
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+<!-- Script -->
+<script>
+  const video = document.getElementById("video");
+  const snapshot = document.getElementById("snapshot");
+  const snapshotImg = document.getElementById("snapshotImg");
+  const statusBox = document.getElementById("status");
+
+  function startCamera() {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
         video.srcObject = stream;
-        streamStarted = true;
-        statusDiv.textContent = "Camera started successfully.";
-      } catch (err) {
-        console.error("Camera error:", err);
-        statusDiv.textContent = "Error accessing camera.";
+      })
+      .catch(err => {
+        showStatus("Error accessing camera", "danger");
+        console.error(err);
+      });
+  }
+
+  function takeSnapshot() {
+    const canvas = snapshot;
+    const context = canvas.getContext("2d");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = canvas.toDataURL("image/png");
+    snapshotImg.src = imageData;
+    snapshotImg.style.display = "block";
+
+    // Send to backend
+    fetch("/mark_attendance", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ image: imageData })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        logEntry(data.name, data.time);
+        showStatus(`✅ Attendance marked for ${data.name}`, "success");
+      } else {
+        showStatus("❌ Face not recognized", "warning");
       }
-    }
+    })
+    .catch(err => {
+      console.error(err);
+      showStatus("Server error. Try again.", "danger");
+    });
+  }
 
-    function captureFace() {
-      if (!streamStarted) {
-        statusDiv.textContent = "Start camera first.";
-        return;
-      }
+  function logEntry(name, time) {
+    const li = document.createElement("li");
+    li.className = "list-group-item";
+    li.textContent = `${name} - ${time}`;
+    document.getElementById("logList").prepend(li);
+  }
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      statusDiv.textContent = "Face captured.";
-    }
-
-    async function markAttendance() {
-      if (!canvas.width) {
-        statusDiv.textContent = "Please capture the face first.";
-        return;
-      }
-
-      const imageData = canvas.toDataURL("image/png");
-
-      try {
-        const res = await fetch('/api/mark_attendance', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ image: imageData })
-        });
-
-        const result = await res.json();
-
-        if (res.ok) {
-          statusDiv.textContent = "Attendance marked: " + result.message;
-        } else {
-          statusDiv.textContent = "Error: " + result.message;
-        }
-
-      } catch (err) {
-        console.error("API Error:", err);
-        statusDiv.textContent = "Network or server error.";
-      }
-    }
-  </script>
+  function showStatus(message, type) {
+    statusBox.className = `alert alert-${type}`;
+    statusBox.textContent = message;
+    statusBox.classList.remove("d-none");
+    setTimeout(() => {
+      statusBox.classList.add("d-none");
+    }, 4000);
+  }
+</script>
 </body>
 </html>
