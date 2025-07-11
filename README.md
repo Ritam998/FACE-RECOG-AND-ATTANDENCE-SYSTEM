@@ -1,4 +1,4 @@
-mport cv2
+import cv2
 import os
 from flask import Flask, request, render_template
 from datetime import date, datetime
